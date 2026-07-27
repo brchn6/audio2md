@@ -1,0 +1,20 @@
+# Sensitive credentials
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Audio files
+input.*
+*.m4a
+*.mp3
+*.wav
+
+# Cluster temp files
+*.out
+*.err
+last_*
