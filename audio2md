@@ -1,0 +1,230 @@
+#!/bin/bash
+set -euo pipefail
+
+# ═══════════════════════════════════════════════════════════════
+# audio2md — Audio → English Markdown Summary via Cluster GPU
+# ═══════════════════════════════════════════════════════════════
+# Usage:
+#   ./audio2md <audio-file>                    # Full pipeline
+#   ./audio2md transcribe <audio-file>         # Just transcribe
+#   ./audio2md summarize                       # Just summarize (after transcribe)
+#   ./audio2md fetch <job-id>                  # Get results from cluster
+#   ./audio2md setup                           # Set up conda env on cluster
+#   ./audio2md status                          # Check job status
+#   ./audio2md help                            # Show this message
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+
+info()  { echo -e "${GREEN}[✓]${NC} $1"; }
+warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
+error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
+
+# ── Check prerequisites ──
+check_prereqs() {
+    local missing=0
+    command -v ssh >/dev/null 2>&1 || { error "ssh not found"; missing=1; }
+    command -v scp >/dev/null 2>&1 || { error "scp not found"; missing=1; }
+    ssh -o ConnectTimeout=5 -o BatchMode=yes "$CLUSTER" "echo ok" >/dev/null 2>&1 || {
+        error "Cannot SSH to $CLUSTER (add SSH key: ssh-copy-id $CLUSTER)"; missing=1; }
+    return $missing
+}
+
+# ── Setup conda env on cluster ──
+cmd_setup() {
+    echo "=== Setting up audio2md on $CLUSTER ==="
+    ssh "$CLUSTER" "
+        source /etc/profile.d/modules.sh 2>/dev/null || true
+        module load CUDA/12.4.0 2>/dev/null || true
+        conda create -y -n $CONDA_ENV python=3.11 -c conda-forge 2>&1 | tail -1
+        eval \"\$(conda shell.bash hook)\"
+        conda activate $CONDA_ENV
+        pip install -q torch --index-url https://download.pytorch.org/whl/cu124 2>&1 | tail -1
+        pip install -q faster-whisper transformers accelerate sentencepiece 2>&1 | tail -1
+        mkdir -p $REMOTE_DIR
+    "
+    # Copy source files to cluster
+    scp "$SCRIPT_DIR"/src/*.py "$SCRIPT_DIR"/lsf/*.lsf "$SCRIPT_DIR"/config.sh "$CLUSTER":"$REMOTE_DIR/" 2>&1
+    info "Setup complete on $CLUSTER"
+}
+
+# ── Transcribe audio ──
+cmd_transcribe() {
+    local audio_file="$1"
+    [[ -f "$audio_file" ]] || error "File not found: $audio_file"
+    local audio_name="audio-$(date +%s).$(echo $audio_file | sed 's/.*\.//')"
+
+    echo "=== Transcribing: $audio_file ==="
+    info "Copying audio to cluster..."
+    scp "$audio_file" "$CLUSTER":"$REMOTE_DIR/input.$audio_name"
+    info "Submitting transcription job..."
+
+    local host_arg=""
+    [[ -n "${TRANS_HOST:-}" ]] && host_arg="-m $TRANS_HOST"
+
+    # Copy the LSF script with config and submit
+    local job_output
+    job_output=$(ssh "$CLUSTER" "
+        cd $REMOTE_DIR
+        sed 's|INPUTFILE|input.$audio_name|g; s|WHISPERMODEL|$WHISPER_MODEL|g' lsf/transcribe.lsf |
+        bsub -q $TRANS_QUEUE $host_arg -n $CPU_CORES \
+            -gpu \"num=1:j_exclusive=no:gmem=$GPU_MEM\" \
+            -R \"rusage[mem=${MEM_GB}GB]\" \
+            -R \"span[hosts=1]\" 2>&1
+    ")
+    echo "$job_output"
+    local job_id=$(echo "$job_output" | grep -oP 'Job <\K[0-9]+>?' | tr -d '<>')
+    [[ -n "$job_id" ]] || error "Failed to submit job"
+    info "Transcription job submitted: $job_id (queue: $TRANS_QUEUE)"
+    echo "$job_id" > "$SCRIPT_DIR/.last_transcribe_job"
+    echo "Monitor with: bjobs $job_id"
+}
+
+# ── Summarize transcript ──
+cmd_summarize() {
+    echo "=== Summarizing (translate + structure) ==="
+    local host_arg=""
+    [[ -n "${LLM_HOST:-}" ]] && host_arg="-m $LLM_HOST"
+
+    local job_output
+    job_output=$(ssh "$CLUSTER" "
+        cd $REMOTE_DIR
+        [ -f transcript.md ] || { echo 'No transcript.md found — run transcribe first' >&2; exit 1; }
+        sed 's|LLMMODEL|$LLM_MODEL|g' lsf/summarize.lsf |
+        bsub -q $LLM_QUEUE $host_arg -n 1 \
+            -gpu \"num=1:j_exclusive=no:gmem=$GPU_MEM\" \
+            -R \"rusage[mem=${MEM_GB}GB]\" \
+            -R \"span[hosts=1]\" 2>&1
+    ")
+    echo "$job_output"
+    local job_id=$(echo "$job_output" | grep -oP 'Job <\K[0-9]+>?' | tr -d '<>')
+    [[ -n "$job_id" ]] || error "Failed to submit job"
+    info "Summarization job submitted: $job_id"
+    echo "$job_id" > "$SCRIPT_DIR/.last_summarize_job"
+}
+
+# ── Fetch results ──
+cmd_fetch() {
+    local out_file="${1:-meeting-summary.md}"
+    echo "=== Fetching results ==="
+    local trans_job=""
+    [[ -f "$SCRIPT_DIR/.last_summarize_job" ]] && trans_job=$(cat "$SCRIPT_DIR/.last_summarize_job")
+
+    # Try to get the latest english-summary.md
+    if scp "$CLUSTER":"$REMOTE_DIR/english-summary.md" "$out_file" 2>/dev/null; then
+        info "Summary saved to: $out_file"
+        wc -l "$out_file"
+    else
+        warn "No english-summary.md found yet. Checking job status..."
+        if [[ -n "$trans_job" ]]; then
+            ssh "$CLUSTER" "bjobs $trans_job" 2>/dev/null || warn "Job $trans_job not found — may have finished"
+        fi
+        # List available output files
+        ssh "$CLUSTER" "ls -lh $REMOTE_DIR/*.md $REMOTE_DIR/*.out $REMOTE_DIR/*.err 2>/dev/null"
+    fi
+}
+
+# ── Full pipeline ──
+cmd_pipeline() {
+    local audio_file="$1"
+    cmd_transcribe "$audio_file"
+    info "Waiting for transcription to complete..."
+    local job_id=$(cat "$SCRIPT_DIR/.last_transcribe_job")
+    # Poll for completion
+    while true; do
+        sleep 30
+        local status
+        status=$(ssh "$CLUSTER" "bjobs $job_id" 2>/dev/null | tail -1 | awk '{print $3}')
+        if [[ "$status" == "DONE" ]]; then
+            info "Transcription complete!"
+            break
+        elif [[ "$status" == "EXIT" ]]; then
+            warn "Job failed — check output:"
+            ssh "$CLUSTER" "cat $REMOTE_DIR/transcribe-$job_id.err" | tail -10
+            exit 1
+        fi
+        echo -n "."
+    done
+
+    cmd_summarize
+    info "Waiting for summarization..."
+    job_id=$(cat "$SCRIPT_DIR/.last_summarize_job")
+    while true; do
+        sleep 30
+        local status
+        status=$(ssh "$CLUSTER" "bjobs $job_id" 2>/dev/null | tail -1 | awk '{print $3}')
+        if [[ "$status" == "DONE" ]]; then
+            info "Summarization complete!"
+            break
+        elif [[ "$status" == "EXIT" ]]; then
+            warn "Job failed — check output:"
+            ssh "$CLUSTER" "cat $REMOTE_DIR/summarize-$job_id.err" | tail -10
+            exit 1
+        fi
+        echo -n "."
+    done
+
+    cmd_fetch "${2:-meeting-summary.md}"
+    echo ""
+    info "Done! Summary: ${2:-meeting-summary.md}"
+}
+
+# ── Status check ──
+cmd_status() {
+    echo "=== Recent jobs ==="
+    ssh "$CLUSTER" "bjobs -u $USER 2>/dev/null | head -10"
+    echo "=== Files on cluster ==="
+    ssh "$CLUSTER" "ls -lh $REMOTE_DIR/*.md $REMOTE_DIR/*.out $REMOTE_DIR/*.err 2>/dev/null" || echo "  (no output files yet)"
+    echo "=== Local files ==="
+    ls -lh "$SCRIPT_DIR/"*.md 2>/dev/null || echo "  (no local results)"
+}
+
+# ── Main ──
+main() {
+    check_prereqs
+
+    case "${1:-help}" in
+        setup)
+            cmd_setup
+            ;;
+        transcribe)
+            [[ -n "${2:-}" ]] || error "Usage: audio2md transcribe <audio-file>"
+            cmd_transcribe "$2"
+            ;;
+        summarize)
+            cmd_summarize
+            ;;
+        fetch)
+            cmd_fetch "${2:-meeting-summary.md}"
+            ;;
+        status)
+            cmd_status
+            ;;
+        help|--help|-h)
+            head -30 "$0"
+            echo ""
+            echo "Commands:"
+            echo "  audio2md setup                    Setup conda env on cluster"
+            echo "  audio2md <audio-file> [output]    Full pipeline (transcribe + summarize)"
+            echo "  audio2md transcribe <audio-file>  Just transcribe audio"
+            echo "  audio2md summarize                Just summarize (after transcribe)"
+            echo "  audio2md fetch [output.md]        Get results from cluster"
+            echo "  audio2md status                   Check job and file status"
+            echo "  audio2md help                     Show this message"
+            echo ""
+            echo "Examples:"
+            echo "  ./audio2md meeting.m4a"
+            echo "  ./audio2md ~/Downloads/voice.m4a my-summary.md"
+            echo ""
+            echo "First run:  ./audio2md setup"
+            ;;
+        *)
+            [[ -f "${1}" ]] || error "File not found: $1. Try: audio2md help"
+            cmd_pipeline "$1" "${2:-meeting-summary.md}"
+            ;;
+    esac
+}
+
+main "$@"
