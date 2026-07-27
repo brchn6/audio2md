@@ -5,8 +5,8 @@
 # Load secrets from .env if present
 [ -f "$(cd "${BASH_SOURCE[0]%/*}" && pwd)/.env" ] && source "$(cd "${BASH_SOURCE[0]%/*}" && pwd)/.env"
 
-# Cluster SSH target (user@host)
-CLUSTER="login4"
+# Cluster SSH target (user@host) — e.g. "login-node"
+CLUSTER="my-cluster"
 
 # Working directory on cluster
 REMOTE_DIR="\$HOME/dev/audio2md"
@@ -18,12 +18,12 @@ LOCAL_DIR="$HOME/dev/audio2md"
 CONDA_ENV="audio2md"
 
 # GPU queue for transcription
-TRANS_QUEUE="rhel96-gpu"
-TRANS_HOST="dgn06"        # specific host (or leave empty)
+TRANS_QUEUE="gpu-queue"
+TRANS_HOST=""              # specific host (or leave empty)
 
 # GPU queue for summarization
-LLM_QUEUE="rhel96-gpu"
-LLM_HOST="dgn06"          # specific host (or leave empty)
+LLM_QUEUE="gpu-queue"
+LLM_HOST=""                # specific host (or leave empty)
 
 # GPU resources
 GPU_MEM="8G"

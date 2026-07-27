@@ -8,9 +8,8 @@
 
 ### LSF Gotchas
 - `#BSUB -oo ~/path` does NOT expand `~` — use absolute paths `/home/...`
-- Some GPU-queue nodes (`hgn*`) don't actually have GPUs — verify with `bhosts -gpu`
-- `rhel96-gpu` queue is often empty (good for quick jobs)
-- Target specific hosts with `-m dgn06` to avoid headless nodes
+- Some GPU-queue nodes don't actually have GPUs — verify with `bhosts -gpu`
+- Target specific known GPU hosts with `-m <hostname>` to avoid headless nodes
 
 ### faster-whisper
 - `large-v3` model gives good Hebrew transcription (57% confidence on mixed recording)

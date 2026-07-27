@@ -1,7 +1,7 @@
 ---
 name: audio2md
 description: |
-  Audio-to-markdown meeting summary pipeline for WEXAC cluster.
+  Audio-to-markdown meeting summary pipeline for HPC clusters.
   Takes any audio file (m4a, mp3, wav), transcribes with faster-whisper on GPU,
   then translates Hebrew→English and structures into markdown using Qwen2.5-7B LLM.
   Use when the user wants to transcribe a meeting, summarize audio, or convert
@@ -29,7 +29,7 @@ cd ~/dev/audio2md
 
 ## Cluster Notes
 
-- **GPU nodes**: `dgn06`, `dgn07` (A40), prefer `rhel96-gpu` queue
-- **Avoid**: `hgn*` nodes (some don't have GPUs despite being in GPU queues)
-- **Specific host**: use `-m dgn06` in bsub to target known GPU nodes
-- **SSH**: passwordless to `login4.wexac.weizmann.ac.il`
+- **GPU queues**: Use your cluster's GPU queue (e.g. `gpu`, `short-gpu`)
+- **GPU memory**: Request at least 8 GB GPU memory for Whisper, 16 GB for LLM
+- **Specific hosts**: If some nodes lack GPUs, target known GPU hosts with `-m`
+- **SSH**: Configure passwordless SSH to your cluster's login node

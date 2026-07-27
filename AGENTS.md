@@ -15,8 +15,8 @@ When working on this project, follow these guidelines:
 
 ### LSF Job Submission
 The pipeline submits separate bsub jobs for transcription and summarization.
-Jobs run on `rhel96-gpu` queue, targeting `dgn06` host specifically (some nodes
-in GPU queues don't actually have GPUs — e.g. `hgn*` nodes).
+Jobs run on a GPU queue. Some nodes in GPU queues may not actually have GPUs —
+target known GPU hosts specifically with `-m`.
 
 ### GPU Memory
 - `faster-whisper large-v3` ~4 GB VRAM
@@ -30,7 +30,7 @@ Subsequent runs are faster. The conda env `audio2md` persists after `./audio2md 
 
 ## Known Issues
 
-1. **hgn* nodes** — appear in GPU queues but lack GPUs. Always use `-m dgn06`
+1. **Headless GPU nodes** — some nodes in GPU queues lack actual GPUs. Target known GPU hosts with `-m`
 2. **First run** — slow (downloading ~3 GB Whisper model + ~4 GB LLM). Cache persists.
 3. **Tilde in LSF paths** — `~` is NOT expanded in `#BSUB -oo/-eo`. Use absolute paths.
 4. **Transcription context** — 15000 char limit for LLM. Longer transcripts get truncated.

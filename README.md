@@ -1,6 +1,6 @@
 # audio2md — Audio to English Markdown Summary
 
-**Transform meeting recordings into structured English summaries using the WEXAC cluster's GPUs.**
+**Transform meeting recordings into structured English summaries using HPC cluster GPUs.**
 
 Takes any audio file (m4a, mp3, wav, etc.) and runs it through a two-stage GPU pipeline:
 
@@ -19,8 +19,8 @@ Audio → faster-whisper (GPU) → transcript → Qwen LLM (GPU) → English sum
 
 ## Requirements
 
-- Access to the **WEXAC cluster** (SSH key configured)
-- `conda` available on the cluster (default on WEXAC)
+- Access to an **HPC cluster** with GPU nodes (SSH key configured)
+- `conda` available on the cluster
 
 ## Quick Start
 
@@ -67,7 +67,7 @@ cd ~/dev/audio2md
 ## How It Works
 
 ```
-Your Machine                    WEXAC Cluster (GPU nodes)
+Your Machine                    HPC Cluster (GPU nodes)
 ┌──────────────┐               ┌──────────────────────────┐
 │  audio2md    │── scp audio ──→│  Step 1: faster-whisper  │
 │  CLI tool    │               │  (large-v3, GPU, 4× RT)  │
@@ -83,7 +83,7 @@ Your Machine                    WEXAC Cluster (GPU nodes)
 
 Edit `config.sh` to customize:
 
-- `CLUSTER` — SSH target (default: `login4`)
+- `CLUSTER` — SSH target (e.g. `my-cluster-login`)
 - `WHISPER_MODEL` — `large-v3` (best) or `medium` (faster)
 - `TRANS_QUEUE` / `LLM_QUEUE` — GPU queues (default: `rhel96-gpu`)
 - `GPU_MEM` — GPU memory reservation (default: `8G`)
@@ -117,6 +117,6 @@ Edit `config.sh` to customize:
 
 ## License
 
-Free to use and distribute within the Weizmann Institute of Science.
+Free to use and distribute within your institution.
 
 Built by barc using open-source tools: faster-whisper (MIT), Qwen2.5 (Apache 2.0), Transformers (Apache 2.0).

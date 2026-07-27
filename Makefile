@@ -16,7 +16,7 @@ fetch:
 
 # Clean up cluster working directory
 clean:
-	ssh login4 "rm -rf ~/dev/audio2md/input.* ~/dev/audio2md/*.md ~/dev/audio2md/*.out ~/dev/audio2md/*.err"
+	ssh $(CLUSTER) "rm -rf ~/dev/audio2md/input.* ~/dev/audio2md/*.md ~/dev/audio2md/*.out ~/dev/audio2md/*.err"
 	rm -f meeting-summary.md
 
 # Check status
@@ -25,5 +25,5 @@ status:
 
 # Remove conda env (full reset)
 reset:
-	ssh login4 "conda remove -y -n audio2md --all 2>/dev/null || true"
-	ssh login4 "rm -rf ~/dev/audio2md"
+	ssh $(CLUSTER) "conda remove -y -n audio2md --all 2>/dev/null || true"
+	ssh $(CLUSTER) "rm -rf ~/dev/audio2md"
