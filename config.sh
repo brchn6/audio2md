@@ -2,6 +2,9 @@
 # audio2md configuration
 # Edit this file to match your cluster setup
 
+# Load secrets from .env if present
+[ -f "$(cd "${BASH_SOURCE[0]%/*}" && pwd)/.env" ] && source "$(cd "${BASH_SOURCE[0]%/*}" && pwd)/.env"
+
 # Cluster SSH target (user@host)
 CLUSTER="login4"
 
