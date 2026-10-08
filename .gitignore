@@ -1,0 +1,33 @@
+# Recordings and generated artifacts stay local.
+out/
+*.m4a
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.mp4
+*.segments.jsonl
+*.summary.json
+*.transcript.md
+*.summary.md
+
+# Machine-specific legacy wrappers and profiles (kept locally, not cloned).
+config.sh
+run-full.lsf
+run-full-v2.lsf
+run-meeting.lsf
+summarize-meeting.lsf
+transcribe.lsf
+summarize.lsf
+prompts/he_seed.txt
+prompts/he_en_glossary.md
+prompts/he_seed_meeting.txt
+prompts/he_en_glossary_meeting.md
+
+# Python/runtime files.
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
