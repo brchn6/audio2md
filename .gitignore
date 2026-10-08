@@ -1,20 +1,41 @@
-# Sensitive credentials
+# Private configuration and source recordings
 .env
-
-# Python cache
-__pycache__/
-*.pyc
-
-# macOS
-.DS_Store
-
-# Audio files
+.env.*
 input.*
 *.m4a
 *.mp3
 *.wav
+*.flac
+*.ogg
+*.mp4
 
-# Cluster temp files
+# Generated transcripts, reports, resume state and LSF logs
+out/
+*.segments.jsonl
+*.summary.json
+*.transcript.md
+*.summary.md
 *.out
 *.err
 last_*
+
+# Machine-specific wrappers and prompts from local runs
+run-full.lsf
+run-full-v2.lsf
+run-meeting.lsf
+summarize-meeting.lsf
+transcribe.lsf
+summarize.lsf
+prompts/he_seed.txt
+prompts/he_en_glossary.md
+prompts/he_seed_meeting.txt
+prompts/he_en_glossary_meeting.md
+
+# Python and workstation files
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+.DS_Store

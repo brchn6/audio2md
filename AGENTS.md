@@ -1,36 +1,13 @@
-# audio2md — AI Agent Instructions
+# audio2md - agent orientation
 
-When working on this project, follow these guidelines:
+Canonical pipeline: Python 3.11, Bash, LSF/CUDA, faster-whisper `large-v3`, CTranslate2, PyTorch/Transformers with Qwen2.5-7B-Instruct. Read `README.md` for setup and verified commands.
 
-## Architecture
+- `transcribe.py` writes the timestamped Hebrew transcript and `.segments.jsonl` checkpoint. `summarize_chunked.py` writes the English report and `.summary.json` checkpoint. `run-pipeline.sh` chains them for explicit input and output paths.
+- `requirements.txt` records tested top-level versions. Use an existing environment; ask before package installs, GPU job submissions, or remote pushes.
+- Use `.agents/skills/process-recording/SKILL.md` for a new recording, `.agents/skills/correct-translation/SKILL.md` for a glossary-backed Stage 2 correction, and `.agents/skills/verify-handoff/SKILL.md` for checking and delivering artifacts.
+- Use recording-specific seed and glossary files only when relevant. Keep source recordings, generated outputs, secrets, and local overrides out of Git. Use a new report path instead of overwriting valuable checkpoints.
+- Validate offline with `python -m unittest discover -s tests -v` in an environment with the manifest dependencies, and `bash -n run-pipeline.sh`.
 
-- `audio2md` — Main CLI entry point (bash script)
-- `src/transcribe.py` — Python: faster-whisper on GPU
-- `src/summarize.py` — Python: Qwen2.5 LLM translation + structuring
-- `lsf/transcribe.lsf` — LSF batch script for transcription
-- `lsf/summarize.lsf` — LSF batch script for summarization
-- `config.sh` — Cluster configuration (edit for each user)
+## Historical CLI
 
-## Key Patterns
-
-### LSF Job Submission
-The pipeline submits separate bsub jobs for transcription and summarization.
-Jobs run on a GPU queue. Some nodes in GPU queues may not actually have GPUs —
-target known GPU hosts specifically with `-m`.
-
-### GPU Memory
-- `faster-whisper large-v3` ~4 GB VRAM
-- `Qwen2.5-7B-Instruct float16` ~14 GB VRAM
-- Request `gmem=8G` for whisper, `gmem=16G` would be safer for LLM but 8G works
-  if the node has enough total VRAM (A40 has 48 GB shared across jobs)
-
-### Model Caching
-Models are cached in `~/.cache/huggingface/` on the cluster after first download.
-Subsequent runs are faster. The conda env `audio2md` persists after `./audio2md setup`.
-
-## Known Issues
-
-1. **Headless GPU nodes** — some nodes in GPU queues lack actual GPUs. Target known GPU hosts with `-m`
-2. **First run** — slow (downloading ~3 GB Whisper model + ~4 GB LLM). Cache persists.
-3. **Tilde in LSF paths** — `~` is NOT expanded in `#BSUB -oo/-eo`. Use absolute paths.
-4. **Transcription context** — 15000 char limit for LLM. Longer transcripts get truncated.
+The pre-merge `audio2md` SSH CLI, `src/`, `lsf/`, `Makefile`, `INSTALL.md`, `config.sh`, and root `SKILL.md` are preserved for history but are not the canonical pipeline. The old summarizer truncates long transcripts. Its setup and cleanup commands may install packages, download models, or delete data; never run them as part of the canonical workflow. `config.sh` is a tracked legacy template; keep real host configuration and credentials in an ignored local `.env` or outside the repository. Do not silently update two pipelines for one task.

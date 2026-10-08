@@ -1,4 +1,5 @@
 #!/bin/bash
+# Legacy SSH CLI retained for compatibility. For new recordings use run-pipeline.sh.
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════

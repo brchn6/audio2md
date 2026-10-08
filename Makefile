@@ -1,3 +1,4 @@
+# Legacy SSH CLI targets. clean/reset delete data; use only with explicit approval.
 .PHONY: all setup clean dist
 
 all: setup

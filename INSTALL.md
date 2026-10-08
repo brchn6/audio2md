@@ -1,4 +1,6 @@
-# audio2md — Installation Guide
+# Legacy SSH CLI installation guide
+
+This guide applies only to the preserved pre-merge `./audio2md` SSH CLI. For new recordings use the canonical GPU pipeline in `README.md`. The `setup` command below installs packages and downloads models; do not run it without explicit approval.
 
 ## Prerequisites
 
